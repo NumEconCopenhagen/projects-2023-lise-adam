@@ -26,7 +26,7 @@ class HouseholdSpecializationModelClass:
         par.epsilon = 1.0
         par.omega = 0.5 
         par.gamma = 0.5
-        par.phi= 0.5
+        par.phi= 0.5 #Variable for our new model in Question 5
         par.gender = 0.0 #dummy for whether we use model in Question 5 or not.
 
         # c. household production
