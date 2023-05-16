@@ -46,7 +46,7 @@ class PrincipalAgentClass():
     
     def calc_utility(self,wH,wL,e):
         par = self.par
-        utility = self.high_sales_prob(e) * (np.power(wH,(1-par.rho + 1e-12)) /(1-par.rho + 1e-12)-par.c*e)+(1-self.high_sales_prob(e))*(np.power(wL,(1-par.rho + 1e-12)/(1-par.rho + 1e-12))-par.c*e)
+        utility = self.high_sales_prob(e) * (np.power(wH,(1-par.rho)) /(1-par.rho) -par.c*e)+(1-self.high_sales_prob(e))*(np.power(wL,(1-par.rho)/(1-par.rho))-par.c*e)
         return utility
 
     def solve(self):
@@ -63,7 +63,7 @@ class PrincipalAgentClass():
         cons = [ {'type': 'ineq', 'fun': lambda x:  self.calc_utility(x[0],x[1],1)-par.ubar}, {'type': 'ineq', 'fun': lambda x: self.calc_utility(x[0],x[1],1)-self.calc_utility(x[0],x[1],0)}]
 
         # d. setting bounds 
-        bounds = ((0,15),(0,15))
+        bounds = ((0,100),(0,100))
 
         # d. initial guess
         initial_guess = [12.25,2.25] 
