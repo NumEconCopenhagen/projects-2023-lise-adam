@@ -1,107 +1,78 @@
 from types import SimpleNamespace
-import time
 import numpy as np
 from scipy import optimize
 
 class PrincipalAgentClass():
 
     def __init__(self, do_print=True):
-        """ create the model """
+        """  setup the model """
 
         if do_print: print('initializing the model:')
 
-        self.par = SimpleNamespace()
-        self.sim = SimpleNamespace() #Simulation variables
+        # a. create namespaces
+        par = self.par = SimpleNamespace()
+        sol = self.sol = SimpleNamespace()
 
-    
-    def setup(self):
-        """ baseline parameters """
-
-        par = self.par
-
-        # a. agent
-        par.pi0 = 0.5  # probability of high sales when employee is hungover
-        par.pie = 0.6  # probability of high sales when employee is not hungover
+        # b. parameters
+        par.pi_0 = 0.3  # probability of high sales when employee is hungover
         par.c = 1.0  # employee's cost of working hard/Not going out
-        par.ubar = 0.0  # reservation utility level
+        par.ubar = 5.0  # reservation utility level
+        par.rho = 0.5 # CRRA Parameter
+        par.e = 1.0 # Level of effort (= 1 when not hungover, =0 when hungover)
 
-        # b. principal
-        par.wL = 1.0  # wage when sales are low
-        par.wH = 2.0  # wage when sales are high
+        par.pi_1 = 0.7  # probability of high sales when employee is not hungover
+        
+        # c. solution VED IKK EHELT HVAD DET SKAL VÆRE HER. Vi skal have en vektor der holder løsningen på wH og wL
+        sol.wH = np.zeros([1,1]) + np.nan
+        sol.wL = np.zeros([1,1]) + np.nan
 
-    def allocate(self):
-        """ allocate arrays for simulation """
-
-        par = self.par
-        sim = self.sim
-
-        # a. list of variables
-        employee = ['e', 'sales']
-        principal = ['w', 'expected_wage']
-        utility = ['utility']
-        allvarnames = employee + principal + utility
-
-        # b. allocate
-        for varname in allvarnames:
-            sim.__dict__[varname] = np.nan * np.ones(par.simT)
-
-    def expected_sales(self, e):
-        """ calculate the expected sales given the employee's effort level """
+    def high_sales_prob(self, e):
+        """ expected sales given the employee's effort level """
 
         par = self.par
-
         if e == 0:
-            return par.pi0
+            return par.pi_0
         else:
-            return par.pie
-
-    def expected_wage(self, wH, wL, e):
-        """ calculate the expected wage given wage contract and employee's effort level """
+            return par.pi_1
+    
+    def expected_wage(self, wH, wL):
+        """ calculate the expected wage and the utility of the employee given the wage contract, effort level and probability of high sales"""
 
         par = self.par
 
-        expected_sales = self.expected_sales(e)
-        expected_wage = expected_sales * wH + (1 - expected_sales) * wL
-
-        utility = self.utility(wH, wL, e, expected_sales)
-
-        return expected_wage, utility
-
-    def utility(self, wH, wL, e, sales):
-        """ calculate the utility of the employee given wage contract, effort level, and sales """
-
+        wage = self.high_sales_prob(1) * wH + (1 - self.high_sales_prob(1)) * wL
+        
+        return wage
+    
+    def calc_utility(self,wH,wL,e):
         par = self.par
-
-        wage = sales * wH + (1 - sales) * wL
-        utility = (wage ** (1 - par.sigma)) / (1 - par.sigma) - par.c * e
-
-        if utility < par.ubar:
-            return par.ubar
-        else:
-            return utility
-
-    def objective_function(self, x):
-        """ calculate the objective function to be minimized """
-
-        wH, wL = x[0], x[1]
-
-        expected_wage_hard, _ = self.expected_wage(wH, wL, 1)
-        expected_wage_facebook, _ = self.expected_wage(wH, wL, 0)
-
-        expected_wage = max(expected_wage_hard, expected_wage_facebook)
-
-        return expected_wage
+        utility = self.high_sales_prob(e) * (np.power(wH,(1-par.rho + 1e-12)) /(1-par.rho + 1e-12)-par.c*e)+(1-self.high_sales_prob(e))*(np.power(wL,(1-par.rho + 1e-12)/(1-par.rho + 1e-12))-par.c*e)
+        return utility
 
     def solve(self):
-        """ solve the model """
+        """ Solving model """
 
+        # a. unpack
         par = self.par
-        sim = self.sim
+        sol = self.sol
 
-        for t in range(par.simT):
+        # b. objective function to be minimized
+        obj = lambda x: self.expected_wage(x[0],x[1])
 
-            # 1. principal solves the wage contract
-            res = optimize.minimize(self.objective_function, [par.wH, par.wL])
-            wH, wL = res.x
+        # c. Setting constraints
+        cons = [ {'type': 'ineq', 'fun': lambda x:  self.calc_utility(x[0],x[1],1)-par.ubar}, {'type': 'ineq', 'fun': lambda x: self.calc_utility(x[0],x[1],1)-self.calc_utility(x[0],x[1],0)}]
 
-            # 2. employee chooses
+        # d. setting bounds 
+        bounds = ((0,15),(0,15))
+
+        # d. initial guess
+        initial_guess = [12.25,2.25] 
+
+        # e. call optimizer
+        res=optimize.minimize(obj, initial_guess, constraints=cons, bounds = bounds, method='SLSQP', tol=1e-12)
+
+        # f. store results
+        sol.wH = res.x[0]
+        sol.wL= res.x[1]
+       
+        return res
