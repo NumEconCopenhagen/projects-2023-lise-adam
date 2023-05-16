@@ -1,6 +1,10 @@
 from types import SimpleNamespace
 import numpy as np
 from scipy import optimize
+import matplotlib.pyplot as plt
+plt.rcParams.update({"axes.grid":True,"grid.color":"black","grid.alpha":"0.25","grid.linestyle":"--"})
+plt.rcParams.update({'font.size': 14})
+
 
 class PrincipalAgentClass():
 
@@ -25,19 +29,24 @@ class PrincipalAgentClass():
 
         par.pi_1 = 0.7  # probability of high sales when employee is not hungover
         
-        # c. solution VED IKK EHELT HVAD DET SKAL VÆRE HER. Vi skal have en vektor der holder løsningen på wH og wL
-        sol.wH_higheffort = np.zeros([1,1]) + np.nan
-        sol.wL_higheffort = np.zeros([1,1]) + np.nan
+        # c. solution 
+        shape = np.zeros([1,1])
 
-        sol.wH_loweffort = np.zeros([1,1]) + np.nan
-        sol.wL_loweffort = np.zeros([1,1]) + np.nan
+        sol.wH_high_effort = shape + np.nan
+        sol.wL_high_effort = shape + np.nan
+        sol.profit_high_effort = shape + np.nan
 
-        sol.wH = np.zeros([1,1]) + np.nan
-        sol.wL = np.zeros([1,1]) + np.nan
-        sol.effort = np.zeros([1,1]) + np.nan
+        sol.wH_loweffort = shape + np.nan
+        sol.wL_loweffort = shape + np.nan
+        sol.profit_low_effort = shape + np.nan
 
-        sol.profit_high_effort = np.zeros([1,1]) + np.nan
-        sol.profit_low_effort = np.zeros([1,1]) + np.nan
+        sol.wH = shape + np.nan
+        sol.wL = shape + np.nan
+        sol.high_effort = shape + np.nan
+        sol.profit = shape + np.nan
+
+        # d. illustrate, compare
+        par.steps = 20
 
 
     def high_sales_prob(self, e):
@@ -99,8 +108,8 @@ class PrincipalAgentClass():
         res_high = optimize.minimize(obj, initial_guess, constraints=cons, bounds = bounds, method='SLSQP', tol=1e-12)
 
         # f. store results
-        sol.wH_higheffort = res_high.x[0]
-        sol.wL_higheffort = res_high.x[1]
+        sol.wH_high_effort = res_high.x[0]
+        sol.wL_high_effort = res_high.x[1]
        
         return res_high
     
@@ -134,24 +143,63 @@ class PrincipalAgentClass():
     
     def solve(self):
         # a. unpack
-        par = self.par
         sol = self.sol
 
         self.solve_high_effort()
-        sol.profit_high_effort = self.expected_profit(sol.wH_higheffort, sol.wL_higheffort, 1)
+        sol.profit_high_effort = self.expected_profit(sol.wH_high_effort, sol.wL_high_effort, 1)
 
         self.solve_low_effort()
         sol.profit_low_effort = self.expected_profit(sol.wH_loweffort, sol.wL_loweffort, 0)
 
         if sol.profit_high_effort>sol.profit_low_effort:
-            sol.wH = sol.wH_higheffort
-            sol.wL = sol.wL_higheffort
-            sol.effort = 1 
+            sol.wH = sol.wH_high_effort
+            sol.wL = sol.wL_high_effort
+            sol.high_effort = True 
+            sol.profit = sol.profit_high_effort
         
         else: 
             sol.wH = sol.wH_loweffort
             sol.wL = sol.wL_loweffort
-            sol.effort = 0
+            sol.effort = True
+            sol.profit = sol.profit_low_effort
+
+    def compare(self, parameter, low, high):
+        par = self.par
+        sol = self.sol
+        steps = par.steps
+
+        grid = np.linspace(low,high,steps)
+
+        wH = np.nan + np.zeros(steps)
+        wL = np.nan + np.zeros(steps)
+        profit_low_effort = np.nan + np.zeros(steps)
+        profit_high_effort = np.nan + np.zeros(steps)
+        
+        for i, param_value in enumerate(grid):
+            par.__dict__[parameter] = param_value
+            self.solve()
+            wH[i] = sol.wH
+            wL[i] = sol.wL 
+            profit_low_effort[i] = sol.profit_low_effort
+            profit_high_effort[i] = sol.profit_high_effort
+
+        fig = plt.figure(figsize=(2*6,6/1.5))
+
+        ax = fig.add_subplot(1,2,1)
+        ax.set_title(f'Wages depending on {str(parameter)}')
+        ax.plot(grid,wH,label=r'$w_H$')
+        ax.plot(grid,wL, label=r'$w_L$')
+        ax.set(xlabel =f'{parameter}')
+        ax.legend(frameon=True)
+
+        ax = fig.add_subplot(1,2,2)
+        ax.set_title(f'Profits depending on {parameter}')
+        ax.plot(grid,profit_low_effort,label='Profit low effort')
+        ax.plot(grid,profit_high_effort, label='Profit high effort')
+        ax.set(xlabel =f'{parameter}')
+        ax.legend(frameon=True)
+        fig.tight_layout()
+
 
 
     
